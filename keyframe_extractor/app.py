@@ -21,6 +21,7 @@ from file_utils import save_frames_to_folder
 from landmark_extractor import (
     LANDMARK_METHODS,
     extract_landmarks_from_frames,
+    draw_landmarks_on_frames,
     TOTAL_FEATURES,
 )
 from data_exporter import landmarks_to_numpy, save_landmarks_as_npy
@@ -185,6 +186,28 @@ if uploaded_file is not None:
                                 st.success(msg)
                             else:
                                 st.error(msg)
+
+                        # --- LANDMARK VISUALIZATION ---
+                        st.divider()
+                        st.subheader("🎨 Landmark Visualization")
+                        st.caption(
+                            "🟢 Pose skeleton  ·  🟠 Left hand  ·  🔵 Right hand"
+                        )
+
+                        viz_frames = draw_landmarks_on_frames(
+                            st.session_state["extracted_frames"],
+                            landmarks_data,
+                            method=landmark_choice,
+                        )
+
+                        viz_cols = st.columns(5)
+                        for i, vf in enumerate(viz_frames):
+                            with viz_cols[i % 5]:
+                                st.image(
+                                    vf,
+                                    caption=f"Frame {st.session_state['extracted_indices'][i]}",
+                                    use_container_width=True,
+                                )
 
                 # --- PREVIEW SECTION ---
                 st.divider()

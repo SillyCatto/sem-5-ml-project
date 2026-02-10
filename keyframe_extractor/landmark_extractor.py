@@ -241,3 +241,167 @@ def extract_landmarks_from_frames(
         landmarks_array = _normalize_landmarks(landmarks_array)
 
     return landmarks_array
+
+
+# ---------------------------------------------------------------------------
+# Landmark Visualization
+# ---------------------------------------------------------------------------
+
+# Pose skeleton connections (pairs of landmark indices to draw lines between)
+_POSE_CONNECTIONS = [
+    # Face
+    (0, 1), (1, 2), (2, 3), (3, 7),
+    (0, 4), (4, 5), (5, 6), (6, 8),
+    (9, 10),
+    # Torso
+    (11, 12), (11, 23), (12, 24), (23, 24),
+    # Left arm
+    (11, 13), (13, 15),
+    # Right arm
+    (12, 14), (14, 16),
+    # Left hand (from pose)
+    (15, 17), (15, 19), (15, 21), (17, 19),
+    # Right hand (from pose)
+    (16, 18), (16, 20), (16, 22), (18, 20),
+    # Left leg
+    (23, 25), (25, 27), (27, 29), (27, 31), (29, 31),
+    # Right leg
+    (24, 26), (26, 28), (28, 30), (28, 32), (30, 32),
+]
+
+# Hand connections (21 landmarks per hand)
+_HAND_CONNECTIONS = [
+    # Thumb
+    (0, 1), (1, 2), (2, 3), (3, 4),
+    # Index
+    (0, 5), (5, 6), (6, 7), (7, 8),
+    # Middle
+    (0, 9), (9, 10), (10, 11), (11, 12),
+    # Ring
+    (0, 13), (13, 14), (14, 15), (15, 16),
+    # Pinky
+    (0, 17), (17, 18), (18, 19), (19, 20),
+    # Palm
+    (5, 9), (9, 13), (13, 17),
+]
+
+
+def draw_landmarks_on_frame(
+    frame: np.ndarray,
+    landmarks_flat: np.ndarray,
+    method: str = "MediaPipe Pose + Hands",
+) -> np.ndarray:
+    """
+    Draws extracted landmarks on top of an RGB frame image.
+
+    Args:
+        frame: RGB image as numpy array (H, W, 3).
+        landmarks_flat: Flat array of 258 values for this frame.
+        method: Which landmark method was used (controls what to draw).
+
+    Returns:
+        Copy of the frame with landmarks drawn on it.
+    """
+    import cv2
+
+    overlay = frame.copy()
+    h, w = overlay.shape[:2]
+
+    draw_pose = method in ("MediaPipe Pose", "MediaPipe Pose + Hands")
+    draw_hands = method in ("MediaPipe Hands", "MediaPipe Pose + Hands")
+
+    # --- Parse pose landmarks (33 × 4 = 132 values) ---
+    if draw_pose:
+        pose_data = landmarks_flat[:POSE_FEATURE_COUNT].reshape(NUM_POSE_LANDMARKS, POSE_VALUES_PER_LANDMARK)
+        pose_xy = []  # list of (px, py) or None if zero
+        for lm in pose_data:
+            x, y = lm[0], lm[1]
+            if x == 0 and y == 0:
+                pose_xy.append(None)
+            else:
+                pose_xy.append((int(x * w), int(y * h)))
+
+        # Draw connections
+        for a, b in _POSE_CONNECTIONS:
+            if pose_xy[a] is not None and pose_xy[b] is not None:
+                cv2.line(overlay, pose_xy[a], pose_xy[b], (0, 220, 0), 2, cv2.LINE_AA)
+
+        # Draw landmarks
+        for pt in pose_xy:
+            if pt is not None:
+                cv2.circle(overlay, pt, 4, (0, 255, 100), -1, cv2.LINE_AA)
+                cv2.circle(overlay, pt, 4, (0, 180, 60), 1, cv2.LINE_AA)
+
+    # --- Parse left hand landmarks (21 × 3 = 63 values) ---
+    if draw_hands:
+        lh_offset = POSE_FEATURE_COUNT
+        lh_data = landmarks_flat[lh_offset: lh_offset + HAND_FEATURE_COUNT].reshape(
+            NUM_HAND_LANDMARKS, HAND_VALUES_PER_LANDMARK
+        )
+        lh_xy = []
+        has_left = not np.all(lh_data == 0)
+        if has_left:
+            for lm in lh_data:
+                x, y = lm[0], lm[1]
+                if x == 0 and y == 0:
+                    lh_xy.append(None)
+                else:
+                    lh_xy.append((int(x * w), int(y * h)))
+
+            for a, b in _HAND_CONNECTIONS:
+                if lh_xy[a] is not None and lh_xy[b] is not None:
+                    cv2.line(overlay, lh_xy[a], lh_xy[b], (255, 120, 50), 2, cv2.LINE_AA)
+
+            for pt in lh_xy:
+                if pt is not None:
+                    cv2.circle(overlay, pt, 3, (255, 160, 80), -1, cv2.LINE_AA)
+                    cv2.circle(overlay, pt, 3, (200, 100, 30), 1, cv2.LINE_AA)
+
+        # --- Parse right hand landmarks (21 × 3 = 63 values) ---
+        rh_offset = POSE_FEATURE_COUNT + HAND_FEATURE_COUNT
+        rh_data = landmarks_flat[rh_offset: rh_offset + HAND_FEATURE_COUNT].reshape(
+            NUM_HAND_LANDMARKS, HAND_VALUES_PER_LANDMARK
+        )
+        rh_xy = []
+        has_right = not np.all(rh_data == 0)
+        if has_right:
+            for lm in rh_data:
+                x, y = lm[0], lm[1]
+                if x == 0 and y == 0:
+                    rh_xy.append(None)
+                else:
+                    rh_xy.append((int(x * w), int(y * h)))
+
+            for a, b in _HAND_CONNECTIONS:
+                if rh_xy[a] is not None and rh_xy[b] is not None:
+                    cv2.line(overlay, rh_xy[a], rh_xy[b], (80, 120, 255), 2, cv2.LINE_AA)
+
+            for pt in rh_xy:
+                if pt is not None:
+                    cv2.circle(overlay, pt, 3, (100, 150, 255), -1, cv2.LINE_AA)
+                    cv2.circle(overlay, pt, 3, (50, 80, 200), 1, cv2.LINE_AA)
+
+    return overlay
+
+
+def draw_landmarks_on_frames(
+    frames: list,
+    landmarks_array: np.ndarray,
+    method: str = "MediaPipe Pose + Hands",
+) -> list:
+    """
+    Draws landmarks on a list of frames.
+
+    Args:
+        frames: List of RGB image arrays.
+        landmarks_array: np.ndarray of shape (N, 258).
+        method: Which landmark method was used.
+
+    Returns:
+        List of frames with landmarks drawn on them.
+    """
+    result = []
+    num = min(len(frames), landmarks_array.shape[0])
+    for i in range(num):
+        result.append(draw_landmarks_on_frame(frames[i], landmarks_array[i], method))
+    return result
