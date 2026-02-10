@@ -15,7 +15,12 @@ st.title("🖐️ WLASL Keyframe & Feature Extractor")
 st.sidebar.header("Settings")
 algo_choice = st.sidebar.selectbox(
     "Choose Extraction Algorithm",
-    ("Uniform Sampling (Standard)", "Motion Detection (Action Segments)", "Relative Quantization (Paper Implementation)")
+    (
+        "Uniform Sampling (Standard)",
+        "Motion Detection (Action Segments)",
+        "Optical Flow (Motion Magnitude)",
+        "Relative Quantization (Paper Implementation)"
+    )
 )
 
 num_frames_target = st.sidebar.slider("Target Number of Frames", 10, 50, 30)
@@ -57,6 +62,40 @@ def motion_based_extraction(frames, target_count):
     motion_scores = np.array(motion_scores)
 
     top_indices = np.argsort(motion_scores)[::-1][:target_count]
+    top_indices = np.sort(top_indices)
+    selected_frames = [frames[i] for i in top_indices]
+    return selected_frames, top_indices
+
+def optical_flow_extraction(frames, target_count):
+    if len(frames) < 2:
+        return frames, list(range(len(frames)))
+
+    gray_frames = [cv2.cvtColor(f, cv2.COLOR_RGB2GRAY) for f in frames]
+    flow_scores = []
+
+    for i in range(len(gray_frames) - 1):
+        prev = gray_frames[i]
+        nxt = gray_frames[i + 1]
+        flow = cv2.calcOpticalFlowFarneback(
+            prev,
+            nxt,
+            None,
+            0.5,
+            3,
+            15,
+            3,
+            5,
+            1.2,
+            0
+        )
+        mag, _ = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+        flow_scores.append(float(np.mean(mag)))
+
+    # Pad the last frame score to match length
+    flow_scores.append(0)
+    flow_scores = np.array(flow_scores)
+
+    top_indices = np.argsort(flow_scores)[::-1][:target_count]
     top_indices = np.sort(top_indices)
     selected_frames = [frames[i] for i in top_indices]
     return selected_frames, top_indices
@@ -147,6 +186,12 @@ if uploaded_file is not None:
                     st.session_state['extracted_frames'] = selected
                     st.session_state['extracted_indices'] = idxs
                     st.success(f"Extracted {len(selected)} frames using Motion Detection.")
+
+                elif algo_choice == "Optical Flow (Motion Magnitude)":
+                    selected, idxs = optical_flow_extraction(frames, num_frames_target)
+                    st.session_state['extracted_frames'] = selected
+                    st.session_state['extracted_indices'] = idxs
+                    st.success(f"Extracted {len(selected)} frames using Optical Flow.")
 
                 elif algo_choice == "Relative Quantization (Paper Implementation)":
                     selected, idxs = uniform_sampling(frames, 5)
