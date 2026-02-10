@@ -20,6 +20,7 @@ algo_choice = st.sidebar.selectbox(
         "Uniform Sampling (Standard)",
         "Motion Detection (Action Segments)",
         "Optical Flow (Motion Magnitude)",
+        "Farneback Dense Optical Flow",
         "Keypoint/Skeleton (MediaPipe Pose+Hands)",
         "CNN + LSTM (Feature Change)",
         "Transformer Attention (Self-Attention)",
@@ -97,6 +98,39 @@ def optical_flow_extraction(frames, target_count):
         flow_scores.append(float(np.mean(mag)))
 
     # Pad the last frame score to match length
+    flow_scores.append(0)
+    flow_scores = np.array(flow_scores)
+
+    top_indices = np.argsort(flow_scores)[::-1][:target_count]
+    top_indices = np.sort(top_indices)
+    selected_frames = [frames[i] for i in top_indices]
+    return selected_frames, top_indices
+
+def farneback_dense_optical_flow_extraction(frames, target_count):
+    if len(frames) < 2:
+        return frames, list(range(len(frames)))
+
+    gray_frames = [cv2.cvtColor(f, cv2.COLOR_RGB2GRAY) for f in frames]
+    flow_scores = []
+
+    for i in range(len(gray_frames) - 1):
+        prev = cv2.GaussianBlur(gray_frames[i], (5, 5), 0)
+        nxt = cv2.GaussianBlur(gray_frames[i + 1], (5, 5), 0)
+        flow = cv2.calcOpticalFlowFarneback(
+            prev,
+            nxt,
+            None,
+            0.5,
+            3,
+            15,
+            3,
+            5,
+            1.2,
+            0
+        )
+        mag, _ = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+        flow_scores.append(float(np.mean(mag)))
+
     flow_scores.append(0)
     flow_scores = np.array(flow_scores)
 
@@ -382,6 +416,12 @@ if uploaded_file is not None:
                     st.session_state['extracted_frames'] = selected
                     st.session_state['extracted_indices'] = idxs
                     st.success(f"Extracted {len(selected)} frames using Optical Flow.")
+
+                elif algo_choice == "Farneback Dense Optical Flow":
+                    selected, idxs = farneback_dense_optical_flow_extraction(frames, num_frames_target)
+                    st.session_state['extracted_frames'] = selected
+                    st.session_state['extracted_indices'] = idxs
+                    st.success(f"Extracted {len(selected)} frames using Farneback Dense Optical Flow.")
 
                 elif algo_choice == "Keypoint/Skeleton (MediaPipe Pose+Hands)":
                     selected, idxs = keypoint_skeleton_extraction(frames, num_frames_target)
