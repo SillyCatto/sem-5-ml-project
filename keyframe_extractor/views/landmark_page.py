@@ -4,8 +4,6 @@ Landmark Extractor Page
 Convert extracted keyframes to MediaPipe landmarks for model training.
 """
 
-import tkinter as tk
-from tkinter import filedialog
 from pathlib import Path
 
 import cv2
@@ -34,6 +32,8 @@ def init_session_state():
         st.session_state["lm_raw_landmarks"] = None
     if "lm_selected_folder" not in st.session_state:
         st.session_state["lm_selected_folder"] = None
+    if "lm_save_folder" not in st.session_state:
+        st.session_state["lm_save_folder"] = ""
 
 
 def render():
@@ -85,24 +85,18 @@ def _render_folder_loader():
     st.subheader("📂 Load Keyframes")
     st.caption("Select a folder containing extracted keyframe images (.png or .jpg).")
 
-    # Use a button to trigger folder picker
-    if st.button("📁 Browse for Keyframes Folder"):
-        root = tk.Tk()
-        root.withdraw()
-        root.wm_attributes("-topmost", 1)
-        folder_path = filedialog.askdirectory(title="Select Keyframes Folder")
-        root.destroy()
+    folder_path = st.text_input(
+        "Keyframes folder path",
+        value=st.session_state.get("lm_selected_folder") or "",
+        placeholder="/absolute/path/to/keyframes",
+    )
 
-        if folder_path:
-            st.session_state["lm_selected_folder"] = folder_path
-
-    if st.session_state["lm_selected_folder"]:
-        st.info(f"Selected folder: `{st.session_state['lm_selected_folder']}`")
-
+    if folder_path:
+        st.session_state["lm_selected_folder"] = folder_path
         if st.button("📥 Load Keyframes"):
             _load_keyframes_from_folder()
     else:
-        st.info("Click the button above to select a folder with extracted keyframes.")
+        st.info("Paste the folder path that contains the extracted keyframes.")
 
 
 def _load_keyframes_from_folder():
@@ -215,10 +209,17 @@ def _render_landmark_results(landmark_choice):
         )
 
     # Save as .npy
+    st.text_input(
+        "Output folder path for .npy",
+        key="lm_save_folder",
+        placeholder="/absolute/path/to/output",
+    )
+
     if st.button("💾 Save Landmarks as .npy"):
         success, msg = save_landmarks_as_npy(
             landmarks_data,
             st.session_state["lm_folder_name"],
+            target_dir=st.session_state.get("lm_save_folder") or None,
         )
         if success:
             st.success(msg)

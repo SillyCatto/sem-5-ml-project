@@ -3,32 +3,27 @@ File saving utilities for the WLASL Keyframe & Feature Extractor.
 """
 
 import os
-import tkinter as tk
-from tkinter import filedialog
 
 import cv2
 
 
 def save_frames_to_folder(
-    frames: list, indices, video_name: str
+    frames: list, indices, video_name: str, target_dir: str | None = None
 ) -> tuple[bool, str]:
     """
-    Opens a folder picker dialog and saves extracted frames as JPEG images.
+    Saves extracted frames as JPEG images to the provided folder.
 
     Returns:
         (success: bool, message: str)
     """
-    # 1. Open Folder Picker
-    root = tk.Tk()
-    root.withdraw()  # Hide the main window
-    root.wm_attributes("-topmost", 1)  # Bring picker to front
-    target_dir = filedialog.askdirectory(title="Select Folder to Save Frames")
-    root.destroy()
-
     if not target_dir:
-        return False, "No folder selected."
+        return False, "Please provide an output folder path."
 
-    # 2. Create Sub-folder
+    target_dir = os.path.expanduser(target_dir)
+    if not os.path.isdir(target_dir):
+        return False, "Output folder does not exist."
+
+    # Create Sub-folder
     video_clean_name = os.path.splitext(video_name)[0]
     save_path = os.path.join(target_dir, video_clean_name)
 

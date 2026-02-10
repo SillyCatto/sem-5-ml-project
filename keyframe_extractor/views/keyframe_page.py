@@ -27,6 +27,8 @@ def init_session_state():
         st.session_state["kf_extracted_indices"] = None
     if "kf_video_name" not in st.session_state:
         st.session_state["kf_video_name"] = ""
+    if "kf_output_folder" not in st.session_state:
+        st.session_state["kf_output_folder"] = ""
 
 
 def render():
@@ -108,6 +110,12 @@ def _display_extracted_frames(algo_choice):
     st.divider()
 
     # --- SAVE FRAMES BUTTON ---
+    st.text_input(
+        "Output folder path for keyframes",
+        key="kf_output_folder",
+        placeholder="/absolute/path/to/output",
+    )
+
     if st.button("💾 Save Frames to Folder"):
         if algo_choice == "Relative Quantization (Paper Implementation)":
             st.warning(
@@ -119,6 +127,7 @@ def _display_extracted_frames(algo_choice):
                 st.session_state["kf_extracted_frames"],
                 st.session_state["kf_extracted_indices"],
                 st.session_state["kf_video_name"],
+                target_dir=st.session_state.get("kf_output_folder") or None,
             )
             if success:
                 st.success(msg)

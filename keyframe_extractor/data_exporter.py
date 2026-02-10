@@ -5,8 +5,6 @@ Converts extracted landmarks to numpy arrays and saves them as .npy files.
 """
 
 import os
-import tkinter as tk
-from tkinter import filedialog
 
 import numpy as np
 
@@ -44,27 +42,25 @@ def landmarks_to_numpy(
 
 
 def save_landmarks_as_npy(
-    data: np.ndarray, video_name: str
+    data: np.ndarray, video_name: str, target_dir: str | None = None
 ) -> tuple[bool, str]:
     """
-    Opens a folder picker dialog and saves landmark data as a .npy file.
+    Saves landmark data as a .npy file to the provided folder.
 
     Args:
         data: np.ndarray of shape (30, 258).
         video_name: Original video filename (used for naming the .npy file).
+        target_dir: Output folder path.
 
     Returns:
         (success: bool, message: str)
     """
-    # Open Folder Picker
-    root = tk.Tk()
-    root.withdraw()
-    root.wm_attributes("-topmost", 1)
-    target_dir = filedialog.askdirectory(title="Select Folder to Save Landmarks (.npy)")
-    root.destroy()
-
     if not target_dir:
-        return False, "No folder selected."
+        return False, "Please provide an output folder path."
+
+    target_dir = os.path.expanduser(target_dir)
+    if not os.path.isdir(target_dir):
+        return False, "Output folder does not exist."
 
     video_clean_name = os.path.splitext(video_name)[0]
     filename = f"{video_clean_name}.npy"
