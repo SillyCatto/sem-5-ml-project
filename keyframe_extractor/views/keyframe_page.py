@@ -12,7 +12,12 @@ from pathlib import Path
 import numpy as np
 import streamlit as st
 
-from video_utils import get_frames_from_video
+from video_utils import (
+    get_frames_from_video,
+    get_video_info,
+    preprocess_frames,
+    VALID_SIZES,
+)
 from algorithms import (
     ALGORITHM_MAP,
     ALGORITHM_NAMES,
@@ -95,15 +100,87 @@ def render():
     tfile.close()
     video_path = tfile.name
 
+    # ── VIDEO INFO ──────────────────────────────────────────────────────────
+    info = get_video_info(video_path)
+    st.caption(
+        f"📹 Native: {info['width']}×{info['height']}  |  "
+        f"{info['fps']:.1f} fps  |  {info['frame_count']} frames"
+    )
+
+    # ── PREPROCESSING OPTIONS ───────────────────────────────────────────────
+    with st.expander("⚙️ Video Preprocessing", expanded=False):
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("**Spatial Rescaling**")
+            rescale_choice = st.selectbox(
+                "Resize all frames to",
+                options=["No rescaling"] + list(VALID_SIZES.keys()),
+                key="kf_rescale",
+                help="Downsample frames before extraction. Reduces memory & speeds up RAFT.",
+            )
+
+            st.markdown("**FPS Resampling**")
+            resample_fps = st.checkbox(
+                "Resample to 30 fps",
+                value=True,
+                key="kf_resample_fps",
+                help="Skip frames so the video is treated as exactly 30 fps. "
+                     "Videos already at ≤30 fps are unaffected.",
+            )
+
+        with col2:
+            st.markdown("**Contrast Enhancement**")
+            run_contrast = st.checkbox(
+                "Pixel contrast normalisation",
+                value=False,
+                key="kf_contrast",
+                help="Min-max stretch each frame to full [0, 255] range.",
+            )
+            run_clahe = st.checkbox(
+                "CLAHE (adaptive histogram equalisation)",
+                value=False,
+                key="kf_clahe",
+                help="Enhances local contrast while preserving colour (LAB L-channel).",
+            )
+            if run_clahe:
+                clahe_clip = st.slider(
+                    "CLAHE clip limit",
+                    min_value=1.0, max_value=8.0, value=2.0, step=0.5,
+                    key="kf_clahe_clip",
+                )
+            else:
+                clahe_clip = 2.0
+
+    target_fps = 30.0 if resample_fps else 0
+
     try:
-        frames = get_frames_from_video(video_path)
+        frames = get_frames_from_video(video_path, target_fps=target_fps)
 
         if not frames:
             st.error("Could not extract frames.")
             return
 
-        st.subheader(f"Original Video ({len(frames)} frames)")
-        st.image(frames[len(frames) // 2], caption="Middle Frame Preview", width=400)
+        # Apply preprocessing pipeline
+        rescale_size = VALID_SIZES.get(rescale_choice) if rescale_choice != "No rescaling" else None
+        frames = preprocess_frames(
+            frames,
+            rescale_size=rescale_size,
+            run_contrast_norm=run_contrast,
+            run_clahe=run_clahe,
+            clahe_clip=clahe_clip,
+        )
+
+        pre_info = []
+        if rescale_size:   pre_info.append(f"resized to {rescale_size[0]}×{rescale_size[1]}")
+        if resample_fps:   pre_info.append("30 fps")
+        if run_contrast:   pre_info.append("contrast normalised")
+        if run_clahe:      pre_info.append(f"CLAHE clip={clahe_clip}")
+        if pre_info:
+            st.success(f"✅ Preprocessing applied: {', '.join(pre_info)}  → {len(frames)} frames")
+
+        st.subheader(f"Preprocessed Video ({len(frames)} frames)")
+        st.image(frames[len(frames) // 2], caption="Middle Frame Preview (after preprocessing)", width=400)
 
         # --- EXTRACTION BUTTON ---
         if st.button("Extract Keyframes"):
