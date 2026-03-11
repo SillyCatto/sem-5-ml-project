@@ -15,7 +15,7 @@
 ### Getting started
 - **Its recommended to use UV, [see here](https://docs.astral.sh/uv/getting-started/installation/)**
 - To sync dependencies, run `uv sync` at root of the project
-- Launch the keyframe extractor tool: `uv run streamlit run ./keyframe_extractor/app.py`
+- Launch the keyframe extractor tool: `uv run streamlit run .\main.py`
 
 ### Dataset
 **Based on WLASL**\
