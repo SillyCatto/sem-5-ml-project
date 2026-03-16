@@ -110,3 +110,24 @@ Get-Item .\checkpoints\mini_brother_mother_quick5\best_model.pth | Select-Object
 - Training terminal returned to prompt.
 - No training-related Python process remained active.
 - Checkpoint timestamp stopped changing.
+
+## Prediction Dry Run (Streamlit)
+
+### UI path used
+
+- Opened the new `Predict Sign` tab.
+- Set checkpoint path to:
+	- `checkpoints/mini_brother_mother_quick5/best_model.pth`
+- Set class labels to:
+	- `brother,mother`
+
+### Initial behavior observed
+
+- The app correctly loaded the model and produced ranked predictions.
+- Typical early output was near-tie confidence (example: mother 0.5013 vs brother 0.4987).
+- Because confidence was near 0.50, status often appeared as `Not confident` when threshold was higher.
+
+### Interpretation
+
+- This is expected for a very small dataset and short training.
+- End-to-end inference flow is functioning correctly.
