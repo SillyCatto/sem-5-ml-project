@@ -131,3 +131,31 @@ Get-Item .\checkpoints\mini_brother_mother_quick5\best_model.pth | Select-Object
 
 - This is expected for a very small dataset and short training.
 - End-to-end inference flow is functioning correctly.
+
+## GitHub Dry-Run Checklist
+
+### Files and folders included in this update
+
+- Prediction backend and UI wiring:
+	- `app/core/inference.py`
+	- `app/views/predict_page.py`
+	- `app/views/__init__.py`
+	- `main.py`
+- Training and dataset compatibility fixes:
+	- `model/dataset.py`
+	- `model/trainer.py`
+	- `app/preprocessing/video_normalizer.py`
+	- `app/preprocessing/__init__.py`
+- Documentation:
+	- `docs/Dryrun of Mother and Brother Samples.md`
+
+### Items intentionally excluded from GitHub
+
+- Runtime artifacts like checkpoints (`checkpoints/`), raw dataset videos (`dataset/`), and generated preprocessed outputs.
+- These are already ignored by project gitignore rules and should stay local.
+
+## Recommended Next Steps
+
+1. Train a slightly longer run (20 to 50 epochs) for more stable confidence separation.
+2. Re-test all 6 videos and record per-video predictions in this same document.
+3. Add more samples per class before treating metrics as meaningful.
