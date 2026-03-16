@@ -575,7 +575,7 @@ def multimodal_fusion_extraction(frames: list, target_count: int) -> tuple[list,
 
 # --- Algorithm registry for clean UI dispatch ---
 ALGORITHM_MAP = {
-    "Multimodal fusion (recommended final approach)": lambda frames, n: (
+    "Method D - Multimodal fusion (recommended final approach)": lambda frames, n: (
         multimodal_fusion_extraction(frames, n)
     ),
     "Optical Flow (Motion Magnitude)": lambda frames, n: (
