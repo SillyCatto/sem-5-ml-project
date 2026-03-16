@@ -515,6 +515,35 @@ def _quality_filter_and_fill(
     return sorted(set(filtered))[:target_count]
 
 
+def _finalize_selection(selected: list[int], n_frames: int, target_count: int) -> np.ndarray:
+    """Guarantee exact target count while preserving temporal spread and endpoint bias."""
+    if n_frames == 0:
+        return np.asarray([], dtype=np.int32)
+
+    selected = _apply_endpoint_bias(selected, n_frames)
+    selected = _enforce_temporal_diversity(selected, n_frames, target_count)
+
+    if len(selected) < target_count:
+        anchors = np.linspace(0, n_frames - 1, target_count)
+        for anchor in anchors:
+            idx = int(round(float(anchor)))
+            if idx not in selected:
+                selected.append(idx)
+            if len(selected) >= target_count:
+                break
+
+    if len(selected) > target_count:
+        anchors = np.linspace(0, n_frames - 1, target_count)
+        src = np.asarray(sorted(set(selected)), dtype=np.int32)
+        picked = []
+        for anchor in anchors:
+            choice = int(src[int(np.argmin(np.abs(src - anchor)))])
+            picked.append(choice)
+        selected = picked
+
+    return np.asarray(sorted(set(selected))[:target_count], dtype=np.int32)
+
+
 def multimodal_fusion_extraction(frames: list, target_count: int) -> tuple[list, list]:
     """Method D: Multimodal fusion with descriptor clustering and quality constraints."""
     if len(frames) <= target_count:
@@ -539,14 +568,7 @@ def multimodal_fusion_extraction(frames: list, target_count: int) -> tuple[list,
         hand_coverage,
         target_count,
     )
-    selected = _enforce_temporal_diversity(selected, len(frames), target_count)
-
-    if len(selected) < target_count:
-        filler = list(np.linspace(0, len(frames) - 1, target_count, dtype=int))
-        merged = sorted(set(selected + filler))
-        selected = merged[:target_count]
-
-    selected = np.asarray(sorted(selected[:target_count]), dtype=np.int32)
+    selected = _finalize_selection(selected, len(frames), target_count)
     selected_frames = [frames[i] for i in selected]
     return selected_frames, selected
 
