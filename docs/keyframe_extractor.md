@@ -15,7 +15,7 @@ This is critical because:
 
 | File | Purpose |
 |------|---------|
-| `app/core/algorithms.py` | Keyframe extraction algorithms (including Method D multimodal fusion) |
+| `app/core/algorithms.py` | Keyframe extraction algorithms (including multimodal fusion) |
 | `keyframe_extractor/video_utils.py` | Video I/O (reading frames from video files) |
 | `app/views/keyframe_page.py` | Streamlit UI that lets users choose an algorithm and extract keyframes |
 
@@ -219,7 +219,7 @@ This is a **visualization mode**, not a frame selection algorithm for training. 
 
 ---
 
-### 10. Method D - Multimodal Fusion (Recommended Final Approach)
+### 10. Multimodal Fusion
 
 **How it works:**
 Builds a multimodal descriptor per frame, clusters frame-level descriptors, and selects medoids with temporal and quality constraints.
@@ -261,7 +261,7 @@ selected_frames, indices = algo_fn(frames, target_count=30)
 
 | Scenario | Recommended Algorithm |
 |---|---|
-| Best overall quality (recommended) | Method D - Multimodal fusion |
+| Best overall quality | Multimodal fusion |
 | Quick extraction, any video | Uniform Sampling |
 | Sign language, fast motion | Motion Detection or Optical Flow |
 | Sign language, noisy video | Farneback Dense Optical Flow |

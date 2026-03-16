@@ -20,7 +20,7 @@ from app.core.file_utils import save_frames_to_folder
 from ._folder_browser import folder_input_with_browse
 
 
-METHOD_D_NAME = "Method D - Multimodal fusion (recommended final approach)"
+METHOD_D_NAME = "Multimodal fusion"
 
 
 def init_session_state():
@@ -54,7 +54,7 @@ def render():
     )
     if keyframe_algo_choice == METHOD_D_NAME:
         st.info(
-            "Method D combines motion, pose dynamics, and appearance embeddings. "
+            "Multimodal fusion combines motion, pose dynamics, and appearance embeddings. "
             "It is slower than optical-flow-only methods but is usually more robust "
             "across different sign styles."
         )

@@ -545,7 +545,7 @@ def _finalize_selection(selected: list[int], n_frames: int, target_count: int) -
 
 
 def multimodal_fusion_extraction(frames: list, target_count: int) -> tuple[list, list]:
-    """Method D: Multimodal fusion with descriptor clustering and quality constraints."""
+    """Multimodal fusion with descriptor clustering and quality constraints."""
     if len(frames) <= target_count:
         idxs = list(range(len(frames)))
         return [frames[i] for i in idxs], np.asarray(idxs, dtype=np.int32)
@@ -575,7 +575,7 @@ def multimodal_fusion_extraction(frames: list, target_count: int) -> tuple[list,
 
 # --- Algorithm registry for clean UI dispatch ---
 ALGORITHM_MAP = {
-    "Multimodal fusion (recommended final approach)": lambda frames, n: (
+    "Multimodal fusion": lambda frames, n: (
         multimodal_fusion_extraction(frames, n)
     ),
     "Optical Flow (Motion Magnitude)": lambda frames, n: (

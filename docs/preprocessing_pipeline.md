@@ -16,7 +16,7 @@
    - [Step 8: Background & Motion Masks](#step-8-background--motion-masks)
    - [Step 9: Data Augmentation](#step-9-data-augmentation)
    - [Step 10: Sequence Length Normalization](#step-10-sequence-length-normalization)
-    - [Method D: Multimodal Fusion Keyframe Selection](#method-d-multimodal-fusion-keyframe-selection)
+    - [Multimodal Fusion Keyframe Selection](#multimodal-fusion-keyframe-selection)
    - [Step 11: Caching & Storage](#step-11-caching--storage)
    - [Step 12: Quality Checks & Validation](#step-12-quality-checks--validation)
 5. [Critical Warnings for Sign Language Data](#critical-warnings-for-sign-language-data)
@@ -435,9 +435,9 @@ graph TD
 
 ---
 
-### Method D: Multimodal Fusion Keyframe Selection
+### Multimodal Fusion Keyframe Selection
 
-**Status:** Recommended final approach for keyframe extraction.
+**Status:** Strong general-purpose option for keyframe extraction.
 
 **What:**
 Selects keyframes by combining motion, pose dynamics, and appearance descriptors, then clustering and selecting medoids with temporal and quality constraints.
