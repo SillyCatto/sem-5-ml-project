@@ -90,3 +90,23 @@ uv run python -c "from model.trainer import train_model; train_model(landmarks_d
 
 - Dataset size is tiny (6 total samples), so validation metrics can fluctuate heavily.
 - The objective was pipeline verification, not final model quality.
+
+## Monitoring and Runtime Checks Used
+
+### Check if training is still running
+
+```powershell
+Get-Process python,uv -ErrorAction SilentlyContinue | Select-Object Id,ProcessName,CPU,StartTime
+```
+
+### Check checkpoint update time and size
+
+```powershell
+Get-Item .\checkpoints\mini_brother_mother_quick5\best_model.pth | Select-Object LastWriteTime,Length
+```
+
+### How we confirmed completion
+
+- Training terminal returned to prompt.
+- No training-related Python process remained active.
+- Checkpoint timestamp stopped changing.
