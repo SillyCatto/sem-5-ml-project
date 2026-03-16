@@ -18,8 +18,12 @@ from tqdm import tqdm
 import numpy as np
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, confusion_matrix
 
-from sign_classifier import create_model
-from dataset import create_data_loaders
+try:
+    from .sign_classifier import create_model
+    from .dataset import create_data_loaders
+except ImportError:
+    from sign_classifier import create_model
+    from dataset import create_data_loaders
 
 
 class Trainer:
