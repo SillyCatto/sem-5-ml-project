@@ -7,8 +7,9 @@ wheels/
 *.egg-info
 .pip-cache/
 .pytest_cache/
-
+.checkpoints/
 .DS_Store
+checkpoints
 
 # Virtual environments
 .venv

@@ -1,0 +1,26 @@
+{
+  "source_video": "mother_3.mp4",
+  "label": "mother",
+  "original_frame_count": 70,
+  "trimmed_frame_count": 37,
+  "trim_range": [
+    24,
+    60
+  ],
+  "crop_bbox": [
+    798,
+    220,
+    1502,
+    1080
+  ],
+  "crop_size": [
+    312,
+    256
+  ],
+  "keypoint_confidence_mean": 0.6536,
+  "target_fps": 25,
+  "target_sequence_length": 32,
+  "flow_computed": false,
+  "pipeline_version": "1.0.0",
+  "processing_timestamp": "2026-03-16T18:53:50.673086+00:00"
+}

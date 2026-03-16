@@ -1,0 +1,26 @@
+{
+  "source_video": "brother_3.mp4",
+  "label": "brother",
+  "original_frame_count": 81,
+  "trimmed_frame_count": 51,
+  "trim_range": [
+    10,
+    60
+  ],
+  "crop_bbox": [
+    90,
+    50,
+    235,
+    240
+  ],
+  "crop_size": [
+    335,
+    256
+  ],
+  "keypoint_confidence_mean": 0.6817,
+  "target_fps": 25,
+  "target_sequence_length": 32,
+  "flow_computed": false,
+  "pipeline_version": "1.0.0",
+  "processing_timestamp": "2026-03-16T18:51:59.895098+00:00"
+}
