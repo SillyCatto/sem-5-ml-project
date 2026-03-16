@@ -20,6 +20,9 @@ from app.core.file_utils import save_frames_to_folder
 from ._folder_browser import folder_input_with_browse
 
 
+METHOD_D_NAME = "Method D - Multimodal fusion (recommended final approach)"
+
+
 def init_session_state():
     """Initialize session state variables for keyframe extractor."""
     if "kf_extracted_frames" not in st.session_state:
@@ -39,9 +42,22 @@ def render():
     st.caption("Extract keyframes from sign language videos for dataset preparation.")
 
     # --- ALGORITHM SELECTOR ---
-    keyframe_algo_choice = st.selectbox(
-        "Keyframe Extraction Algorithm", ALGORITHM_NAMES
+    default_index = (
+        ALGORITHM_NAMES.index(METHOD_D_NAME)
+        if METHOD_D_NAME in ALGORITHM_NAMES
+        else 0
     )
+    keyframe_algo_choice = st.selectbox(
+        "Keyframe Extraction Algorithm",
+        ALGORITHM_NAMES,
+        index=default_index,
+    )
+    if keyframe_algo_choice == METHOD_D_NAME:
+        st.info(
+            "Method D combines motion, pose dynamics, and appearance embeddings. "
+            "It is slower than optical-flow-only methods but is usually more robust "
+            "across different sign styles."
+        )
 
     # --- TARGET FRAME COUNT ---
     num_frames_target = st.number_input(
