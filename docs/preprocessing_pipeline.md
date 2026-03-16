@@ -16,6 +16,7 @@
    - [Step 8: Background & Motion Masks](#step-8-background--motion-masks)
    - [Step 9: Data Augmentation](#step-9-data-augmentation)
    - [Step 10: Sequence Length Normalization](#step-10-sequence-length-normalization)
+    - [Method D: Multimodal Fusion Keyframe Selection](#method-d-multimodal-fusion-keyframe-selection)
    - [Step 11: Caching & Storage](#step-11-caching--storage)
    - [Step 12: Quality Checks & Validation](#step-12-quality-checks--validation)
 5. [Critical Warnings for Sign Language Data](#critical-warnings-for-sign-language-data)
@@ -431,6 +432,42 @@ graph TD
     D --> F
     E --> F
 ```
+
+---
+
+### Method D: Multimodal Fusion Keyframe Selection
+
+**Status:** Recommended final approach for keyframe extraction.
+
+**What:**
+Selects keyframes by combining motion, pose dynamics, and appearance descriptors, then clustering and selecting medoids with temporal and quality constraints.
+
+**Descriptor construction (`frame_descriptors.npy` concept):**
+- `flow_scalar`: per-frame optical flow magnitude summary.
+- `pose_features`: arm angles, wrist/hand velocities, and hand-distance geometry.
+- `embedding_pca`: compact frame appearance embedding reduced by PCA.
+
+Final descriptor per frame:
+
+$$
+	ext{descriptor}_t = [\text{flow\_scalar}_t \;||\; \text{pose\_features}_t \;||\; \text{embedding\_pca}_t]
+$$
+
+**Selection procedure:**
+1. Normalize descriptors and reduce dimensionality (PCA; UMAP can be used as an alternative).
+2. Cluster reduced descriptors with `k = target_keyframes` (k-means; spectral fallback).
+3. Pick one medoid per cluster (closest member to cluster center).
+4. Enforce temporal diversity if selected frames collapse into one time region.
+5. Add endpoint bias so near-start and near-end frames are represented.
+6. Final quality filter drops frames with:
+    - low hand-keypoint confidence
+    - very small hand crop coverage
+7. Refill to target count with best remaining candidates if filtering removes too many frames.
+
+**Why this is robust:**
+- Captures both dynamic and static sign information.
+- Preserves timeline coverage (important for sign onset/hold/release phases).
+- Avoids selecting visually redundant high-motion bursts only.
 
 ---
 
