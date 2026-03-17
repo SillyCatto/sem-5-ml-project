@@ -231,15 +231,9 @@ def predict_video(
     )
 
     landmarks = torch.from_numpy(keypoints).unsqueeze(0).to(resolved_device)
-    flow_dim = int(checkpoint_config.get("flow_dim", DEFAULT_FLOW_DIM))
-    flow = torch.zeros(
-        (1, max(1, landmarks.shape[1] - 1), flow_dim),
-        dtype=torch.float32,
-        device=resolved_device,
-    )
 
     with torch.no_grad():
-        logits = model(landmarks, flow)
+        logits = model(landmarks)
         probabilities = torch.softmax(logits, dim=1)[0].detach().cpu().numpy()
 
     top_indices = np.argsort(probabilities)[::-1][: max(1, top_k)]
@@ -280,12 +274,10 @@ def _resolve_device(device: str | None) -> str:
 
 def _extract_model_kwargs(model_type: str, config: dict) -> dict:
     landmark_dim = int(config.get("landmark_dim", KEYPOINT_DIM))
-    flow_dim = int(config.get("flow_dim", DEFAULT_FLOW_DIM))
 
     if model_type == "lstm":
         return {
             "landmark_dim": landmark_dim,
-            "flow_dim": flow_dim,
             "hidden_dim": int(config.get("hidden_dim", 256)),
             "num_layers": int(config.get("num_layers", 2)),
             "dropout": float(config.get("dropout", 0.3)),
@@ -294,7 +286,6 @@ def _extract_model_kwargs(model_type: str, config: dict) -> dict:
     if model_type == "transformer":
         return {
             "landmark_dim": landmark_dim,
-            "flow_dim": flow_dim,
             "d_model": int(config.get("d_model", 256)),
             "nhead": int(config.get("nhead", 8)),
             "num_layers": int(config.get("num_layers", 4)),
@@ -304,7 +295,6 @@ def _extract_model_kwargs(model_type: str, config: dict) -> dict:
     if model_type == "hybrid":
         return {
             "landmark_dim": landmark_dim,
-            "flow_dim": flow_dim,
             "hidden_dim": int(config.get("hidden_dim", 256)),
             "num_lstm_layers": int(config.get("num_lstm_layers", 2)),
             "num_attention_heads": int(config.get("num_attention_heads", 4)),
