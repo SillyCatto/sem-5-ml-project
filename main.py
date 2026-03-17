@@ -10,7 +10,7 @@ import streamlit as st
 from app.views import (
     keyframe_page,
     landmark_page,
-    manual_keyframe_page,
+    # manual_keyframe_page,
     predict_page,
     preprocessing_page,
 )
@@ -52,13 +52,13 @@ st.markdown(
 # =============================================================================
 st.title("🖐️ WLASL Sign Tool")
 
-tab_predict, tab_preprocess, tab_manual, tab_keyframe, tab_landmark = st.tabs(
+tab_preprocess, tab_keyframe, tab_landmark, tab_predict = st.tabs(
     [
-        "🎯 Predict Sign",
         "🔧 Video Preprocessing",
-        "🖱️ Manual Keyframe Selection",
+        # "🖱️ Manual Keyframe Selection",
         "📹 Keyframe Extractor",
         "🦴 Landmark Extractor",
+        "🎯 Predict Sign",
     ]
 )
 
@@ -68,8 +68,8 @@ with tab_predict:
 with tab_preprocess:
     preprocessing_page.render()
 
-with tab_manual:
-    manual_keyframe_page.render()
+# with tab_manual:
+#     manual_keyframe_page.render()
 
 with tab_keyframe:
     keyframe_page.render()
