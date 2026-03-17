@@ -111,7 +111,7 @@ def render() -> None:
             tmp.write(video_file.read())
             tmp_path = Path(tmp.name)
 
-        cfg = PipelineConfig(target_sequence_length=int(target_length))
+        cfg = PipelineConfig()
 
         try:
             with st.spinner("Preprocessing video and running prediction…"):
@@ -121,6 +121,7 @@ def render() -> None:
                     manual_labels=manual_labels,
                     confidence_threshold=float(threshold),
                     cfg=cfg,
+                    target_sequence_length=int(target_length),
                 )
             st.session_state[_key("result")] = result
         except Exception as exc:
