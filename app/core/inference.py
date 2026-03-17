@@ -26,7 +26,10 @@ from app.preprocessing.clahe import apply_clahe
 from app.preprocessing.config import PipelineConfig
 from app.preprocessing.frame_extraction import extract_frames
 from app.preprocessing.signer_crop import analyze_signer, crop_frames
-from app.preprocessing.temporal_trim import compute_wrist_velocity, detect_idle_boundaries
+from app.preprocessing.temporal_trim import (
+    compute_wrist_velocity,
+    detect_idle_boundaries,
+)
 from app.preprocessing.video_normalizer import normalize_video
 from app.preprocessing.video_writer import resize_with_padding
 
@@ -91,7 +94,11 @@ def resolve_class_names(
     checkpoint_config = checkpoint_config or {}
     landmarks_dir = checkpoint_config.get("landmarks_dir")
     if landmarks_dir:
-        class_dirs = [path for path in Path(landmarks_dir).iterdir() if path.is_dir()] if Path(landmarks_dir).exists() else []
+        class_dirs = (
+            [path for path in Path(landmarks_dir).iterdir() if path.is_dir()]
+            if Path(landmarks_dir).exists()
+            else []
+        )
         class_names = sorted(path.name for path in class_dirs)
         if class_names:
             return class_names
@@ -103,7 +110,9 @@ def resolve_class_names(
     return [f"class_{index}" for index in range(num_classes)]
 
 
-def load_checkpoint(checkpoint_path: str | Path, device: str | None = None) -> tuple[torch.nn.Module, dict, list[str], str]:
+def load_checkpoint(
+    checkpoint_path: str | Path, device: str | None = None
+) -> tuple[torch.nn.Module, dict, list[str], str]:
     """Load a saved checkpoint and rebuild the matching model."""
     resolved_device = _resolve_device(device)
     checkpoint = torch.load(checkpoint_path, map_location=resolved_device)
@@ -203,7 +212,9 @@ def predict_video(
         checkpoint_path, device=device
     )
     if manual_labels:
-        class_names = resolve_class_names(checkpoint_config, manual_labels=manual_labels)
+        class_names = resolve_class_names(
+            checkpoint_config, manual_labels=manual_labels
+        )
 
     if target_sequence_length is None:
         target_sequence_length = int(
@@ -234,7 +245,9 @@ def predict_video(
     top_indices = np.argsort(probabilities)[::-1][: max(1, top_k)]
     ranked = [
         {
-            "label": class_names[int(index)] if int(index) < len(class_names) else f"class_{int(index)}",
+            "label": class_names[int(index)]
+            if int(index) < len(class_names)
+            else f"class_{int(index)}",
             "index": int(index),
             "confidence": float(probabilities[int(index)]),
         }
@@ -315,7 +328,9 @@ def _pad_or_truncate(keypoints: np.ndarray, target_len: int) -> np.ndarray:
     return np.vstack([keypoints, pad])
 
 
-def _extract_pose_hands_keypoints(frames_rgb: list[np.ndarray]) -> tuple[np.ndarray, float]:
+def _extract_pose_hands_keypoints(
+    frames_rgb: list[np.ndarray],
+) -> tuple[np.ndarray, float]:
     """
     Extract 258-dim keypoints per frame:
       pose (33 x [x,y,z,visibility]) + left hand (21 x [x,y,z]) + right hand (21 x [x,y,z]).
