@@ -227,12 +227,12 @@ def _render_save_section(result: PipelineResult):
     folder_input_with_browse(
         "Output folder path",
         session_key="kf_output_folder",
-        placeholder="./output/keyframes",
+        placeholder="./outputs/keyframes",
         dialog_title="Select Output Folder",
     )
 
     if st.button("💾 Save Individual Frames", key="kf_save"):
-        out_dir = st.session_state.get("kf_output_folder") or "./output/keyframes"
+        out_dir = st.session_state.get("kf_output_folder") or "./outputs/keyframes"
 
         # Create subfolder named after the video
         video_dir = os.path.join(out_dir, result.video_stem)
@@ -264,12 +264,12 @@ def _render_batch_mode(config: PipelineConfig):
     folder_input_with_browse(
         "Output folder path",
         session_key="kf_batch_output",
-        placeholder="./output/keyframes",
+        placeholder="./outputs/keyframes",
         dialog_title="Select Output Folder",
     )
 
     dataset_dir = st.session_state.get("kf_batch_input", "")
-    output_dir = st.session_state.get("kf_batch_output", "") or "./output/keyframes"
+    output_dir = st.session_state.get("kf_batch_output", "") or "./outputs/keyframes"
 
     if not dataset_dir:
         st.info(

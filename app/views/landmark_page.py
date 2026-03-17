@@ -115,7 +115,7 @@ def _render_single_mode(config: LandmarkConfig):
     folder_input_with_browse(
         "Keyframes folder path",
         session_key="lm_input_folder",
-        placeholder="./output/keyframes/label/video_stem",
+        placeholder="./outputs/keyframes/label/video_stem",
         dialog_title="Select Keyframes Folder",
     )
 
@@ -210,12 +210,12 @@ def _render_save_section(result: LandmarkResult):
     folder_input_with_browse(
         "Output folder path",
         session_key="lm_output_folder",
-        placeholder="./output/landmarks",
+        placeholder="./outputs/landmarks",
         dialog_title="Select Output Folder",
     )
 
     if st.button("💾 Save as .npy", key="lm_save"):
-        out_dir = st.session_state.get("lm_output_folder") or "./output/landmarks"
+        out_dir = st.session_state.get("lm_output_folder") or "./outputs/landmarks"
         out_path = os.path.join(out_dir, f"{result.video_stem}.npy")
         saved = save_landmarks(result.landmarks, out_path)
         st.success(f"✅ Saved → `{saved}`  (shape: {result.landmarks.shape})")
@@ -237,19 +237,19 @@ def _render_batch_mode(config: LandmarkConfig):
     folder_input_with_browse(
         "Keyframes root folder",
         session_key="lm_batch_input",
-        placeholder="./output/keyframes",
+        placeholder="./outputs/keyframes",
         dialog_title="Select Keyframes Root Folder",
     )
 
     folder_input_with_browse(
         "Output folder for .npy files",
         session_key="lm_batch_output",
-        placeholder="./output/landmarks",
+        placeholder="./outputs/landmarks",
         dialog_title="Select Output Folder",
     )
 
     root_dir = st.session_state.get("lm_batch_input", "")
-    output_dir = st.session_state.get("lm_batch_output", "") or "./output/landmarks"
+    output_dir = st.session_state.get("lm_batch_output", "") or "./outputs/landmarks"
 
     if not root_dir:
         st.info("Paste or browse to the root folder of extracted keyframes.")
