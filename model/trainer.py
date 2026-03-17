@@ -152,19 +152,18 @@ class Trainer:
         with torch.no_grad():
             pbar = tqdm(self.val_loader, desc=f"Epoch {epoch} [Val]")
             
-            for features, labels in pbar:
+            for landmarks, labels in pbar:
                 # Move data to device
-                landmarks = features["landmarks"].to(self.device)
-                flow = features["flow"].to(self.device)
+                landmarks = landmarks.to(self.device)
                 labels = labels.to(self.device)
                 
                 # Forward pass
                 if self.use_mixed_precision:
                     with torch.amp.autocast(device_type=self.device.type):
-                        logits = self.model(landmarks, flow)
+                        logits = self.model(landmarks)
                         loss = self.criterion(logits, labels)
                 else:
-                    logits = self.model(landmarks, flow)
+                    logits = self.model(landmarks)
                     loss = self.criterion(logits, labels)
                 
                 # Track metrics
