@@ -13,15 +13,12 @@ import json
 
 
 class SignLanguageDataset(Dataset):
-    """Dataset combining RAFT optical flow and MediaPipe landmarks."""
+    """Dataset using only MediaPipe landmarks."""
     
     def __init__(
         self,
         landmarks_dir: Path,
-        flow_dir: Optional[Path] = None,
-        extract_flow: bool = True,
         num_frames: int = 30,
-        flow_feature_dim: int = 32,
         transform=None
     ):
         """
@@ -29,17 +26,11 @@ class SignLanguageDataset(Dataset):
         
         Args:
             landmarks_dir: Directory containing landmark .npy files organized by class
-            flow_dir: Directory containing flow .npy files (optional if extract_flow=True)
-            extract_flow: Whether to extract flow on-the-fly
             num_frames: Expected number of frames per sample
-            flow_feature_dim: Dimension of pooled flow features
             transform: Optional transform to apply
         """
         self.landmarks_dir = Path(landmarks_dir)
-        self.flow_dir = Path(flow_dir) if flow_dir else None
-        self.extract_flow = extract_flow
         self.num_frames = num_frames
-        self.flow_feature_dim = flow_feature_dim
         self.transform = transform
         
         # Load dataset metadata
@@ -75,18 +66,9 @@ class SignLanguageDataset(Dataset):
         for class_name in self.classes:
             class_idx = self.class_to_idx[class_name]
             for landmark_file in class_to_files[class_name]:
-                # Match flow by same relative path when available.
-                flow_file = None
-                if self.flow_dir:
-                    rel = landmark_file.relative_to(self.landmarks_dir)
-                    candidate = self.flow_dir / rel
-                    if candidate.exists():
-                        flow_file = candidate
-
                 self.samples.append(
                     {
                         "landmark_path": landmark_file,
-                        "flow_path": flow_file,
                         "class_name": class_name,
                         "class_idx": class_idx,
                     }
@@ -95,14 +77,13 @@ class SignLanguageDataset(Dataset):
     def __len__(self) -> int:
         return len(self.samples)
     
-    def __getitem__(self, idx: int) -> Tuple[Dict[str, torch.Tensor], int]:
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
         """
         Get a sample.
         
         Returns:
-            Tuple of (features_dict, label) where features_dict contains:
-                - "landmarks": (num_frames, 258) landmark features
-                - "flow": (num_frames-1, flow_feature_dim) flow features
+            Tuple of (landmarks_tensor, label)
+                - landmarks_tensor: (num_frames, 258) landmark features
             label: Class index
         """
         sample = self.samples[idx]
@@ -110,32 +91,16 @@ class SignLanguageDataset(Dataset):
         # Load landmarks
         landmarks = np.load(sample["landmark_path"])  # Shape: (30, 258)
         
-        # Load or compute flow
-        if sample["flow_path"] and sample["flow_path"].exists():
-            flow = np.load(sample["flow_path"])
-        elif self.extract_flow:
-            # For now, use zero flow if not available
-            # In production, you'd extract flow here
-            flow = np.zeros((self.num_frames - 1, self.flow_feature_dim))
-        else:
-            flow = np.zeros((self.num_frames - 1, self.flow_feature_dim))
-        
         # Convert to tensors
         landmarks_tensor = torch.from_numpy(landmarks).float()
-        flow_tensor = torch.from_numpy(flow).float()
         
         # Apply transforms if any
         if self.transform:
             landmarks_tensor = self.transform(landmarks_tensor)
         
-        features = {
-            "landmarks": landmarks_tensor,
-            "flow": flow_tensor
-        }
-        
         label = sample["class_idx"]
         
-        return features, label
+        return landmarks_tensor, label
     
     def get_class_distribution(self) -> Dict[str, int]:
         """Get distribution of samples per class."""
@@ -147,7 +112,6 @@ class SignLanguageDataset(Dataset):
 
 def create_data_loaders(
     landmarks_dir: Path,
-    flow_dir: Optional[Path] = None,
     batch_size: int = 16,
     train_split: float = 0.8,
     num_workers: int = 4,
@@ -158,7 +122,6 @@ def create_data_loaders(
     
     Args:
         landmarks_dir: Directory with landmark files
-        flow_dir: Directory with flow files
         batch_size: Batch size for training
         train_split: Fraction of data for training
         num_workers: Number of data loading workers
@@ -169,8 +132,7 @@ def create_data_loaders(
     """
     # Create full dataset
     full_dataset = SignLanguageDataset(
-        landmarks_dir=landmarks_dir,
-        flow_dir=flow_dir
+        landmarks_dir=landmarks_dir
     )
     
     # Split into train and validation
