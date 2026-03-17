@@ -177,26 +177,20 @@ def create_data_loaders(
     return train_loader, val_loader
 
 
-def collate_batch(batch: List[Tuple[Dict[str, torch.Tensor], int]]):
+def collate_batch(batch: List[Tuple[torch.Tensor, int]]):
     """
     Custom collate function for batching.
     
     Args:
-        batch: List of (features_dict, label) tuples
+        batch: List of (landmarks_tensor, label) tuples
         
     Returns:
-        Batched features and labels
+        Batched landmarks and labels
     """
-    landmarks = torch.stack([item[0]["landmarks"] for item in batch])
-    flows = torch.stack([item[0]["flow"] for item in batch])
+    landmarks = torch.stack([item[0] for item in batch])
     labels = torch.tensor([item[1] for item in batch])
     
-    features = {
-        "landmarks": landmarks,
-        "flow": flows
-    }
-    
-    return features, labels
+    return landmarks, labels
 
 
 if __name__ == "__main__":
@@ -218,10 +212,9 @@ if __name__ == "__main__":
         
         # Test loading a sample
         if len(dataset) > 0:
-            features, label = dataset[0]
+            landmarks, label = dataset[0]
             print(f"\nSample 0:")
-            print(f"  Landmarks shape: {features['landmarks'].shape}")
-            print(f"  Flow shape: {features['flow'].shape}")
+            print(f"  Landmarks shape: {landmarks.shape}")
             print(f"  Label: {label} ({dataset.classes[label]})")
     else:
         print(f"\nLandmarks directory not found: {landmarks_path}")
