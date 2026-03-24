@@ -18,6 +18,7 @@ Usage (batch):
 from __future__ import annotations
 
 import logging
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Dict, Optional
@@ -29,6 +30,7 @@ from .quality_checks import generate_dataset_report
 from .signer_crop import analyze_signer, crop_frames
 from .storage import sample_exists, upsert_metadata
 from .temporal_trim import compute_wrist_velocity, detect_idle_boundaries
+from .video_normalizer import normalize_video
 from .video_writer import resize_with_padding, write_video
 
 log = logging.getLogger(__name__)
@@ -155,9 +157,16 @@ class PreprocessingPipeline:
         raw_fps = probe_fps(video_path)
         log.debug("Step 1 — raw_fps=%.2f", raw_fps)
 
-        # Step 2: extract frames (ffmpeg normalises to target_fps in-memory)
-        _cb(2, "Extracting frames")
-        frames = extract_frames(video_path)
+        # Step 2: normalize to CFR with ffmpeg, then decode frames
+        _cb(2, "Normalizing video and extracting frames")
+        with tempfile.TemporaryDirectory(prefix="pose2word_preprocess_") as tmp_dir:
+            normalized_path = Path(tmp_dir) / f"{stem}.mp4"
+            ok = normalize_video(video_path, normalized_path, self.cfg)
+            if not ok:
+                raise RuntimeError(
+                    "Video normalization failed. Check ffmpeg availability."
+                )
+            frames = extract_frames(normalized_path)
         original_frame_count = len(frames)
         if not frames:
             raise RuntimeError("No frames extracted from video.")
