@@ -4,10 +4,9 @@ Inference helpers for upload-and-predict sign recognition.
 The inference path is aligned with preprocessing pipeline v2:
 normalize -> extract frames -> CLAHE -> signer crop -> resize/pad -> temporal trim.
 
-After those steps, this module extracts 258-dim pose+hands features per frame:
-33 pose landmarks x 4 (x, y, z, visibility) +
-21 left-hand x 3 +
-21 right-hand x 3.
+After those steps, this module supports two feature paths:
+    - 168-dim RQ landmarks (default, matches landmark extraction pipeline)
+    - 258-dim legacy pose+hands keypoints (for older checkpoints)
 """
 
 from __future__ import annotations
@@ -18,10 +17,20 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
+import cv2
 import mediapipe as mp
 import numpy as np
 import torch
 
+from app.core.landmark_pipeline import (
+    LandmarkConfig,
+    calibrate_to_shoulders,
+    correct_hand_dominance,
+    extract_landmarks,
+    pad_sequence,
+    relative_quantize,
+    scale_features,
+)
 from app.preprocessing.clahe import apply_clahe
 from app.preprocessing.config import PipelineConfig
 from app.preprocessing.frame_extraction import extract_frames
@@ -66,8 +75,8 @@ class InferenceResult:
 
 
 DEFAULT_SEQUENCE_LENGTH = 32
-DEFAULT_FLOW_DIM = 32
-KEYPOINT_DIM = 258
+RQ_FEATURE_DIM = 168
+LEGACY_KEYPOINT_DIM = 258
 
 _POSE_MODEL_URL = (
     "https://storage.googleapis.com/mediapipe-models/"
@@ -142,6 +151,7 @@ def build_inference_features(
     video_path: str | Path,
     cfg: PipelineConfig | None = None,
     target_sequence_length: int = DEFAULT_SEQUENCE_LENGTH,
+    feature_dim: int = RQ_FEATURE_DIM,
 ) -> tuple[np.ndarray, dict]:
     """Run one uploaded video through the preprocessing path used for inference."""
     cfg = cfg or PipelineConfig()
@@ -179,8 +189,28 @@ def build_inference_features(
         if trimmed_count == 0:
             raise RuntimeError("No active signing segment remained after trimming.")
 
-        keypoints, pose_visibility_mean = _extract_pose_hands_keypoints(frames)
-        keypoints = _pad_or_truncate(keypoints, target_sequence_length)
+        pose_visibility_mean = None
+        dominant_hand = None
+        feature_type = "rq_landmarks"
+
+        if feature_dim == RQ_FEATURE_DIM:
+            keypoints, dominant_hand = _extract_rq_landmarks(
+                frames,
+                target_sequence_length=target_sequence_length,
+            )
+        elif feature_dim == LEGACY_KEYPOINT_DIM:
+            feature_type = "pose_hands_keypoints"
+            keypoints, pose_visibility_mean = _extract_pose_hands_keypoints(frames)
+            keypoints = _pad_or_truncate(
+                keypoints,
+                target_sequence_length,
+                feature_dim=feature_dim,
+            )
+        else:
+            raise ValueError(
+                f"Unsupported feature_dim={feature_dim}. "
+                f"Expected {RQ_FEATURE_DIM} or {LEGACY_KEYPOINT_DIM}."
+            )
 
     metadata = {
         "original_frame_count": original_count,
@@ -188,7 +218,14 @@ def build_inference_features(
         "trim_range": [int(trim_start), int(trim_end)],
         "crop_bbox": [int(value) for value in bbox],
         "crop_size": [int(crop_h), int(crop_w)],
-        "pose_visibility_mean": round(float(pose_visibility_mean), 4),
+        "pose_visibility_mean": (
+            round(float(pose_visibility_mean), 4)
+            if pose_visibility_mean is not None
+            else None
+        ),
+        "dominant_hand": dominant_hand,
+        "feature_dim": int(feature_dim),
+        "feature_type": feature_type,
         "target_sequence_length": int(target_sequence_length),
         "target_fps": int(cfg.target_fps),
         "output_size": [int(cfg.output_size), int(cfg.output_size)],
@@ -223,11 +260,13 @@ def predict_video(
                 checkpoint_config.get("num_frames", DEFAULT_SEQUENCE_LENGTH),
             )
         )
+    feature_dim = int(checkpoint_config.get("landmark_dim", RQ_FEATURE_DIM))
 
     keypoints, metadata = build_inference_features(
         video_path,
         cfg=cfg,
         target_sequence_length=target_sequence_length,
+        feature_dim=feature_dim,
     )
 
     landmarks = torch.from_numpy(keypoints).unsqueeze(0).to(resolved_device)
@@ -273,7 +312,7 @@ def _resolve_device(device: str | None) -> str:
 
 
 def _extract_model_kwargs(model_type: str, config: dict) -> dict:
-    landmark_dim = int(config.get("landmark_dim", KEYPOINT_DIM))
+    landmark_dim = int(config.get("landmark_dim", RQ_FEATURE_DIM))
 
     if model_type == "lstm":
         return {
@@ -303,7 +342,11 @@ def _extract_model_kwargs(model_type: str, config: dict) -> dict:
     return {}
 
 
-def _pad_or_truncate(keypoints: np.ndarray, target_len: int) -> np.ndarray:
+def _pad_or_truncate(
+    keypoints: np.ndarray,
+    target_len: int,
+    feature_dim: int,
+) -> np.ndarray:
     """Pad or truncate keypoint sequence to a fixed temporal length."""
     if target_len <= 0:
         raise ValueError("target sequence length must be > 0")
@@ -314,7 +357,7 @@ def _pad_or_truncate(keypoints: np.ndarray, target_len: int) -> np.ndarray:
     if current_len > target_len:
         return keypoints[:target_len]
 
-    pad = np.zeros((target_len - current_len, KEYPOINT_DIM), dtype=np.float32)
+    pad = np.zeros((target_len - current_len, feature_dim), dtype=np.float32)
     return np.vstack([keypoints, pad])
 
 
@@ -339,13 +382,13 @@ def _extract_pose_hands_keypoints(
         num_hands=2,
     )
 
-    seq = np.zeros((len(frames_rgb), KEYPOINT_DIM), dtype=np.float32)
+    seq = np.zeros((len(frames_rgb), LEGACY_KEYPOINT_DIM), dtype=np.float32)
     pose_vis_scores: list[float] = []
 
     with mp.tasks.vision.PoseLandmarker.create_from_options(pose_options) as pose:
         with mp.tasks.vision.HandLandmarker.create_from_options(hand_options) as hands:
             for i, frame_rgb in enumerate(frames_rgb):
-                vec = np.zeros(KEYPOINT_DIM, dtype=np.float32)
+                vec = np.zeros(LEGACY_KEYPOINT_DIM, dtype=np.float32)
                 mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
 
                 pose_result = pose.detect(mp_img)
@@ -377,6 +420,29 @@ def _extract_pose_hands_keypoints(
 
     pose_visibility_mean = float(np.mean(pose_vis_scores)) if pose_vis_scores else 0.0
     return seq, pose_visibility_mean
+
+
+def _extract_rq_landmarks(
+    frames_rgb: list[np.ndarray],
+    target_sequence_length: int,
+) -> tuple[np.ndarray, str]:
+    """
+    Extract RQ landmarks compatible with the landmark extraction training pipeline.
+
+    Input frames are RGB; the landmark pipeline expects BGR, so frames are converted.
+    """
+    frames_bgr = [cv2.cvtColor(frame, cv2.COLOR_RGB2BGR) for frame in frames_rgb]
+
+    lm_cfg = LandmarkConfig(target_sequence_length=target_sequence_length)
+
+    landmarks = extract_landmarks(frames_bgr, lm_cfg)
+    landmarks, dominant_hand = correct_hand_dominance(landmarks)
+    landmarks = calibrate_to_shoulders(landmarks)
+    landmarks = relative_quantize(landmarks, lm_cfg)
+    landmarks = scale_features(landmarks, lm_cfg)
+    landmarks = pad_sequence(landmarks, lm_cfg)
+
+    return landmarks.astype(np.float32), dominant_hand
 
 
 def _ensure_task_model(filename: str, model_url: str) -> str:
