@@ -312,7 +312,7 @@ def train_model(
     
     Args:
         landmarks_dir: Directory with landmark files
-        flow_dir: Directory with flow files
+        flow_dir: Deprecated. Kept for backward compatibility and ignored.
         model_type: Type of model ("lstm", "transformer", "hybrid")
         num_classes: Number of sign classes
         batch_size: Batch size
@@ -336,7 +336,6 @@ def train_model(
     print("Creating data loaders...")
     train_loader, val_loader = create_data_loaders(
         landmarks_dir=Path(landmarks_dir),
-        flow_dir=Path(flow_dir) if flow_dir else None,
         batch_size=batch_size
     )
     
