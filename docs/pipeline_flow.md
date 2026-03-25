@@ -81,7 +81,7 @@ What you need to provide:
 1. Use `Video Preprocessing` on your dataset
 2. Use `Keyframe Extractor` on the preprocessed videos
 3. Use `Landmark Extractor` on the keyframes
-4. Train using the generated landmark files
+4. Train using the generated landmark files (see next section)
 5. Use `Predict Sign` with the trained checkpoint
 
 **Option B: One-command CLI workflow**
@@ -100,6 +100,30 @@ uv run python util_scripts/run_full_pipeline.py \
 ```
 
 Switch `--device` to `cpu` or `mps` if needed.
+
+### Training: How to get a `.pth` checkpoint
+
+The app does not include a training tab. Training is done via CLI scripts after you have landmark `.npy` files.
+
+If you already have landmark files in `outputs/landmarks` (or another folder), you can run training only:
+
+```bash
+uv run python util_scripts/run_full_pipeline.py \
+  --skip-preprocessing --skip-keyframes --skip-landmarks \
+  --landmarks-dir outputs/landmarks \
+  --checkpoint-dir checkpoints/my_run \
+  --trainer-script model/trainer_current_config-gpu.py \
+  --model-type lstm \
+  --device cpu
+```
+
+This produces:
+
+- `checkpoints/my_run/best_model.pth`
+- `checkpoints/my_run/logs/` (TensorBoard)
+- `checkpoints/my_run/training_history.json`
+
+If you want the full end-to-end run (preprocess -> keyframes -> landmarks -> training), use Option B above without the `--skip-*` flags.
 
 ### Common user gotchas
 
