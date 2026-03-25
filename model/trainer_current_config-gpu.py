@@ -23,8 +23,15 @@ try:
     from .sign_classifier import create_model
     from .dataset import create_data_loaders
 except ImportError:
-    from sign_classifier import create_model
-    from dataset import create_data_loaders
+    # This file is sometimes loaded via importlib from an arbitrary path
+    # (see util_scripts/run_full_pipeline.py). In that case we are not part of
+    # a package, so relative imports fail. Fall back to repo-root imports.
+    try:
+        from model.sign_classifier import create_model  # type: ignore
+        from model.dataset import create_data_loaders  # type: ignore
+    except ImportError:
+        from sign_classifier import create_model  # type: ignore
+        from dataset import create_data_loaders  # type: ignore
 
 
 class Trainer:
