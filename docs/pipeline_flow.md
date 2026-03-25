@@ -1,247 +1,257 @@
-# Pipeline Flow — End-to-End Documentation
+# Pipeline Flow (For Users and Developers)
 
-## Overview
+This document explains how Pose2Word works end-to-end, from raw videos to training and prediction.
 
-This document explains how the **Keyframe Extractor** and **Landmark Extractor** work together as a complete pipeline to transform a raw sign language video into a machine-learning-ready `.npy` file.
+Read it in the way that fits you best:
 
-The pipeline is designed for **WLASL (Word-Level American Sign Language) recognition** — it produces training data in the exact format expected by the recognition model.
+- If you are a user: start at **User View**
+- If you are a developer: start at **Developer View**
 
----
-
-## Pipeline Architecture
-
-```
-┌───────────┐     ┌────────────────┐     ┌─────────────────┐     ┌──────────┐
-│   Video   │────▶│   Keyframe     │────▶│   Landmark      │────▶│  .npy    │
-│   (.mp4)  │     │   Extraction   │     │   Extraction    │     │  File    │
-│           │     │  (30 frames)   │     │  (258 features) │     │(30, 258) │
-└───────────┘     └────────────────┘     └─────────────────┘     └──────────┘
-                   ▲                       ▲
-                   │                       │
-              Choose from 9           Choose: Pose,
-              algorithms              Hands, or Both
-                                      + Normalize?
-                                      + Localize?
-```
+The project has one main training-data pipeline and one main inference pipeline.
 
 ---
 
-## Step-by-Step Flow
+## User View
 
-### Step 1: Video Upload
+### What you can do in the app
 
-The user uploads a sign language video file (`.mp4`, `.mov`, or `.avi`) through the Streamlit web interface.
-
-**What happens internally:**
-1. The uploaded file is written to a temporary file on disk (required by OpenCV).
-2. `video_utils.get_frames_from_video()` reads all frames from the video.
-3. Each frame is converted from BGR (OpenCV's format) to RGB.
-4. A preview of the middle frame is displayed in the UI.
-
-**Output:** A Python list of RGB numpy arrays, one per frame (e.g., 150 frames of shape `(480, 640, 3)`).
-
----
-
-### Step 2: Keyframe Extraction
-
-The user selects one of 9 algorithms and clicks **"Extract Frames"**.
-
-**What happens internally:**
-1. The selected algorithm receives the full frame list and the target count (default: 30).
-2. The algorithm analyzes the frames (motion, optical flow, keypoints, etc.) and selects the most informative ones.
-3. The selected frames and their original indices are stored in session state.
-
-**Output:** Two lists:
-- `extracted_frames` — 30 RGB images (the keyframes)
-- `extracted_indices` — 30 integers (which frames from the original video were selected)
-
-**Displayed in UI:** A grid of keyframe thumbnails labeled with their original frame numbers.
-
-See [Keyframe Extractor Documentation](keyframe_extractor.md) for algorithm details.
-
----
-
-### Step 3: Landmark Extraction
-
-The user selects a landmark method, optionally enables Normalization/Localization, and clicks **"🔍 Extract Landmarks"**.
-
-**What happens internally:**
-1. MediaPipe model files are downloaded (first time only) to `.models/` directory.
-2. **Raw extraction pass:** Each keyframe is processed by MediaPipe PoseLandmarker and/or HandLandmarker. Per frame:
-   - 33 pose landmarks × 4 values = 132 floats
-   - 21 left hand landmarks × 3 values = 63 floats
-   - 21 right hand landmarks × 3 values = 63 floats
-   - Missing landmarks (e.g., hand not visible) are filled with zeros.
-3. The raw landmarks are padded/truncated to exactly the target frame count (30 by default).
-4. Raw landmarks are saved in session state for **visualization**.
-5. **Transformation pass** (if normalization or localization is enabled):
-   - Landmarks are extracted again.
-   - Localization uses multiple origins: pose → mid-hip, each hand → its wrist.
-   - Normalization scales all values to [0, 1] range.
-   - Transformed landmarks are saved separately for **data export**.
-
-**Output:** Two numpy arrays, both of shape `(30, 258)`:
-- `raw_landmarks` — Untransformed, used for visualization.
-- `extracted_landmarks` — Optionally normalized/localized, used for data preview and `.npy` export.
-
-**Displayed in UI:**
-- Summary metrics (shape, non-zero frame count, value range).
-- Expandable data table showing the full 30×258 matrix.
-
-See [Landmark Extractor Documentation](landmark_extractor.md) for feature layout and transformation details.
-
----
-
-### Step 4: Landmark Visualization
-
-After extraction, the landmarks are automatically drawn on the keyframe images.
-
-**What happens internally:**
-1. For each keyframe, the corresponding row from `raw_landmarks` is reshaped:
-   - Pose: 33 landmarks with (x, y, z, visibility)
-   - Left hand: 21 landmarks with (x, y, z)
-   - Right hand: 21 landmarks with (x, y, z)
-2. The (x, y) coordinates (in [0, 1] range) are scaled to pixel coordinates.
-3. Skeleton connections and dots are drawn on a copy of the frame using OpenCV.
-
-**Color coding:**
-- 🟢 **Green** — Pose skeleton (body joints and connections)
-- 🟠 **Orange** — Left hand landmarks and finger connections
-- 🔵 **Blue** — Right hand landmarks and finger connections
-
-**Why raw landmarks are used for visualization:**  
-Normalized/localized coordinates don't map to valid pixel positions (they can be negative or re-scaled), so the visualization always uses the original coordinates.
-
----
-
-### Step 5: Save as .npy
-
-The user clicks **"💾 Save Landmarks as .npy"**.
-
-**What happens internally:**
-1. A folder picker dialog opens (tkinter).
-2. The `extracted_landmarks` array (shape `(30, 258)`, with any normalization/localization applied) is saved as `{video_name}.npy`.
-
-**Output:** A single `.npy` file that can be loaded directly for model training:
-```python
-import numpy as np
-data = np.load("video_name.npy")
-print(data.shape)  # (30, 258)
-```
-
----
-
-### Optional: Save Frames as Images
-
-At any point after keyframe extraction, the user can also click **"💾 Save Frames to Folder"** to save the raw keyframe images as `.jpg` files for manual inspection or other uses.
-
----
-
-## Data Flow Diagram
-
-```
-Video File (.mp4)
-    │
-    ▼
-┌─────────────────────────────────┐
-│ video_utils.get_frames_from_video │
-│ ─ OpenCV reads all frames         │
-│ ─ BGR → RGB conversion            │
-└─────────────┬───────────────────┘
-              │ List of RGB frames
-              ▼
-┌─────────────────────────────────┐
-│ algorithms.py (chosen algorithm)  │
-│ ─ Analyzes motion/features        │
-│ ─ Selects top N frames            │
-└─────────────┬───────────────────┘
-              │ 30 keyframes + indices
-              ▼
-┌─────────────────────────────────┐
-│ landmark_extractor.py             │
-│ ─ MediaPipe Pose + Hands          │
-│ ─ 258 features per frame          │
-│ ─ Optional: normalize/localize    │
-└──────┬──────────────┬───────────┘
-       │              │
-  raw landmarks   transformed landmarks
-       │              │
-       ▼              ▼
-┌───────────┐  ┌──────────────┐
-│ Visualize │  │ Data Preview │
-│ on frames │  │ & .npy Save  │
-└───────────┘  └──────────────┘
-```
-
----
-
-## File Structure
-
-```
-sem-5-ml-project/
-├── keyframe_extractor/
-│   ├── app.py                  ← Streamlit UI (thin orchestration layer)
-│   ├── video_utils.py          ← Video I/O
-│   ├── algorithms.py           ← 9 keyframe extraction algorithms
-│   ├── file_utils.py           ← Frame saving (tkinter folder picker)
-│   ├── landmark_extractor.py   ← Landmark extraction + visualization
-│   ├── data_exporter.py        ← Numpy conversion + .npy saving
-│   └── .models/                ← Auto-downloaded MediaPipe model files
-├── model/
-│   └── WLASL_recognition_using_Action_Detection.ipynb  ← Training notebook
-├── doc/
-│   ├── keyframe_extractor.md   ← This documentation
-│   ├── landmark_extractor.md
-│   └── pipeline_flow.md
-├── main.py
-├── pyproject.toml
-└── uv.lock
-```
-
----
-
-## How to Run
+Run the app:
 
 ```bash
-cd h:\Projects\sem-5-ml-project
-uv run streamlit run keyframe_extractor/app.py
+uv run streamlit run main.py
 ```
 
-This starts a local web server (default: http://localhost:8501) with the full pipeline UI.
+Current tabs:
+
+1. `Video Preprocessing`
+2. `Keyframe Extractor`
+3. `Landmark Extractor`
+4. `Predict Sign`
+
+### Training-data pipeline (what you run to prepare data)
+
+```text
+raw videos
+  -> preprocessing
+  -> preprocessed square clips (.mp4)
+  -> keyframe extraction (images)
+  -> landmark extraction (.npy)
+  -> training (checkpoint .pth)
+```
+
+What each stage produces:
+
+- Preprocessing: a cleaned `.mp4` per sample plus a dataset `metadata.json`
+- Keyframes: a folder of `frame_*.png` images per video
+- Landmarks: one `.npy` file per video (default shape `(15, 168)`)
+- Training: a `best_model.pth` checkpoint plus logs and training history
+
+### If you already have a checkpoint
+
+You can skip dataset preparation and go straight to `Predict Sign`.
+
+You still need:
+
+- the checkpoint file path (example: `checkpoints/my_run/best_model.pth`)
+- the exact class label order used during training
+- a target sequence length that matches training
+
+If any of those do not match, the app may still run, but the predicted label names can be wrong.
+
+### Inference pipeline (what happens when you click Predict)
+
+```text
+uploaded video
+  -> preprocessing (in-memory)
+  -> feature extraction
+  -> checkpoint load
+  -> top-k predictions
+```
+
+What you need to provide:
+
+- a `.pth` checkpoint path
+- the class label order that checkpoint was trained on
+- a target sequence length that matches training
+
+### Two recommended ways to run the pipeline
+
+**Option A: App-driven workflow**
+
+1. Use `Video Preprocessing` on your dataset
+2. Use `Keyframe Extractor` on the preprocessed videos
+3. Use `Landmark Extractor` on the keyframes
+4. Train using the generated landmark files
+5. Use `Predict Sign` with the trained checkpoint
+
+**Option B: One-command CLI workflow**
+
+```bash
+uv run python util_scripts/run_full_pipeline.py \
+  --dataset-dir dataset/raw_video_data \
+  --preprocessed-dir outputs/preprocessed \
+  --keyframes-dir outputs/keyframes \
+  --landmarks-dir outputs/landmarks \
+  --checkpoint-dir checkpoints/lstm_run1 \
+  --trainer-script model/trainer_current_config-gpu.py \
+  --model-type lstm \
+  --num-classes 15 \
+  --device cuda
+```
+
+Switch `--device` to `cpu` or `mps` if needed.
+
+### Common user gotchas
+
+- If you use `Batch` or `Select from dataset` in preprocessing, you need `labels.csv` under the dataset root
+- The prediction tab defaults sequence length to `32`, while the landmark extractor defaults to `15`; those must match training
+- Class order matters: wrong label order means correct scores but wrong label names
+- The paths shown here are defaults; the UI lets you change output folders
 
 ---
 
-## Configuration & Dependencies
+## Developer View
 
-**Package manager:** `uv` (with `pyproject.toml`)
+### The two pipeline graphs
 
-**Dependencies:**
-| Package | Version | Purpose |
-|---|---|---|
-| `streamlit` | ≥1.54.0 | Web UI framework |
-| `opencv-python` | ≥4.13.0.92 | Video I/O, image processing, optical flow |
-| `numpy` | ≥2.4.2 | Array operations, `.npy` saving |
-| `mediapipe` | ≥0.10.32 | Pose and hand landmark detection |
+**Training data path**
 
-**Runtime requirements:**
-- Python ≥3.13
-- Internet connection (first run only, to download MediaPipe model files)
-- Webcam not required (works with video files only)
+```text
+raw videos
+  -> app.preprocessing (writes .mp4 + metadata)
+  -> app.core.keyframe_pipeline (writes keyframe images)
+  -> app.core.landmark_pipeline (writes .npy tensors)
+  -> model/* training (writes .pth checkpoint)
+```
+
+**Inference path**
+
+```text
+uploaded video
+  -> app.core.inference (runs preprocessing subset in memory)
+  -> feature extraction (168-dim default, 258-dim legacy)
+  -> model forward pass
+  -> ranked probabilities
+```
+
+### Where each stage lives
+
+Preprocessing:
+
+- UI: `app/views/preprocessing_page.py`
+- Pipeline: `app/preprocessing/runner.py`
+- Config: `app/preprocessing/config.py`
+- CLI: `app/preprocessing/__main__.py`
+
+Keyframes:
+
+- UI: `app/views/keyframe_page.py`
+- Pipeline: `app/core/keyframe_pipeline.py`
+
+Landmarks:
+
+- UI: `app/views/landmark_page.py`
+- Pipeline: `app/core/landmark_pipeline.py`
+
+Inference:
+
+- UI: `app/views/predict_page.py`
+- Logic: `app/core/inference.py`
+
+Training:
+
+- Data: `model/dataset.py`
+- Models: `model/sign_classifier.py`
+- Recommended trainer: `model/trainer_current_config-gpu.py`
+- Legacy-ish trainer: `model/trainer.py`
+
+### Key defaults and knobs
+
+Defaults you will see in the current code:
+
+- Preprocessing output size is square `512 x 512` unless changed in `PipelineConfig`
+- Keyframe selection defaults to `8..15` unless changed in `keyframe_pipeline.PipelineConfig`
+- Landmark tensors default to `(15, 168)` unless changed in `LandmarkConfig`
+- Inference UI defaults sequence length to `32` unless changed in the predictor tab
+
+Where to change behavior:
+
+- preprocessing: `app/preprocessing/config.py`, `app/preprocessing/runner.py`
+- keyframes: `app/core/keyframe_pipeline.py`
+- landmarks: `app/core/landmark_pipeline.py`
+- inference features: `app/core/inference.py`
+
+### Data contracts (what each stage expects)
+
+Raw dataset for the preprocessing page (batch and dataset picker):
+
+- dataset root plus `labels.csv`
+- typical layout:
+
+```text
+dataset/raw_video_data/
+  labels.csv
+  <label>/
+    <video>.mp4
+```
+
+Expected CSV columns:
+
+```csv
+label,video_name,path
+brother,brother_1.mp4,brother/brother_1.mp4
+```
+
+Preprocessed videos:
+
+```text
+outputs/preprocessed/
+  metadata.json
+  <label>/
+    <video_stem>.mp4
+```
+
+Keyframes:
+
+```text
+outputs/keyframes/
+  <label>/
+    <video_stem>/
+      frame_0.png
+      frame_1.png
+      ...
+```
+
+Landmarks:
+
+```text
+outputs/landmarks/
+  <label>/
+    <video_stem>.npy
+```
+
+Checkpoints:
+
+```text
+checkpoints/<run_name>/
+  best_model.pth
+  logs/
+  training_history.json
+```
+
+### Feature formats (why you see 168 and sometimes 258)
+
+- Current default: `168`-dimensional RQ landmarks used by `app/core/landmark_pipeline.py`
+- Legacy compatibility: `258`-dimensional pose-plus-hands keypoints supported by `app/core/inference.py` for older checkpoints
+
+### Important developer caveats
+
+- The repo is landmark-first; RAFT exists but is not wired into the main training/inference path
+- Streamlit preprocessing batch uses `labels.csv`, but the CLI preprocessing path can walk `.mp4` files without it
+- The predictor’s sequence length must match training; the UI default may not match your dataset defaults
 
 ---
 
-## Relationship to the Model Notebook
+## How Things Connect (One Paragraph)
 
-The recognition model ([WLASL_recognition_using_Action_Detection.ipynb](../model/WLASL_recognition_using_Action_Detection.ipynb)) expects:
-
-1. **Input:** `.npy` files with shape `(30, 258)` — exactly what this pipeline produces.
-2. **Directory structure:** One folder per word/class, containing multiple `.npy` files (one per video).
-3. **Feature layout:** `[Pose_132 | Left_Hand_63 | Right_Hand_63]` — matches our extraction format.
-
-The notebook handles data augmentation, model training (LSTM-based), and evaluation. This pipeline is the **data preparation step** that comes before training.
-
-```
-This Pipeline                          Model Notebook
-─────────────                          ──────────────
-Video → Keyframes → Landmarks → .npy   →  Load .npy → Train LSTM → Predict
-```
+Preprocessing standardizes raw videos into square, trimmed `.mp4` clips so later stages are more stable. Keyframe extraction then selects 8 to 15 informative frames per clip and writes them as `frame_*.png`. Landmark extraction turns those images into fixed-length `(T, 168)` tensors using MediaPipe Tasks plus Relative Quantization. Training consumes those `.npy` tensors to produce a checkpoint. Prediction loads that checkpoint, runs the preprocessing subset in memory on a new upload, extracts matching features, and returns ranked class probabilities.
