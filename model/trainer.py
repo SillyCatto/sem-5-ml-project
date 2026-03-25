@@ -22,8 +22,15 @@ try:
     from .sign_classifier import create_model
     from .dataset import create_data_loaders
 except ImportError:
-    from sign_classifier import create_model
-    from dataset import create_data_loaders
+    # This file may be loaded via importlib from an arbitrary path (for example
+    # by util scripts). In that case relative imports fail. Fall back to
+    # repo-root imports.
+    try:
+        from model.sign_classifier import create_model  # type: ignore
+        from model.dataset import create_data_loaders  # type: ignore
+    except ImportError:
+        from sign_classifier import create_model  # type: ignore
+        from dataset import create_data_loaders  # type: ignore
 
 
 class Trainer:
